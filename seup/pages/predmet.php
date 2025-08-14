@@ -632,11 +632,11 @@ document.addEventListener("DOMContentLoaded", function() {
         button.classList.add('seup-loading');
         
         console.log('Starting sync with type:', syncType);
-        console.log('Predmet ID:', <?php echo $caseId; ?>);
+        console.log('Predmet ID:', <?php echo (int)$caseId; ?>);
         
         const formData = new FormData();
         formData.append('action', 'sync_nextcloud');
-        formData.append('predmet_id', <?php echo $caseId; ?>);
+        formData.append('predmet_id', '<?php echo (int)$caseId; ?>');
         formData.append('sync_type', syncType);
         formData.append('token', document.querySelector("input[name='token']").value);
         

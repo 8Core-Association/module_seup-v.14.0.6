@@ -82,10 +82,10 @@ try {
     
     // Debug: Log all POST data
     dol_syslog("POST data: " . print_r($_POST, true), LOG_INFO);
-    dol_syslog("GET data: " . print_r($_GET, true), LOG_INFO);
+    dol_syslog("Raw input: " . file_get_contents('php://input'), LOG_INFO);
     
     if (!$predmet_id) {
-        throw new Exception('Missing predmet ID');
+        throw new Exception('Missing predmet ID. Received: ' . print_r($_POST, true));
     }
     
     // Check if required functions exist
