@@ -24,12 +24,15 @@ class Cloud_helper
      */
     public static function syncNextcloudToECM($db, $conf, $user, $predmet_id)
     {
+        dol_syslog("Starting Nextcloud to ECM sync for predmet: " . $predmet_id, LOG_INFO);
+        
         try {
             // Check if Nextcloud is enabled and configured
             if (!getDolGlobalString('NEXTCLOUD_ENABLED', '0') || 
                 empty(getDolGlobalString('NEXTCLOUD_URL')) ||
                 empty(getDolGlobalString('NEXTCLOUD_USERNAME')) ||
                 empty(getDolGlobalString('NEXTCLOUD_PASSWORD'))) {
+                dol_syslog("Nextcloud not configured properly", LOG_WARNING);
                 dol_syslog("Nextcloud not configured, skipping sync", LOG_INFO);
                 return ['success' => true, 'message' => 'Nextcloud not configured', 'synced' => 0];
             }
@@ -41,8 +44,12 @@ class Cloud_helper
             $nextcloudApi = new NextcloudAPI($db, $conf);
             $relative_path = Predmet_helper::getPredmetFolderPath($predmet_id, $db);
             
+            dol_syslog("Syncing path: " . $relative_path, LOG_INFO);
+            
             // Get files from Nextcloud
             $nextcloudFiles = $nextcloudApi->getFilesFromFolder($relative_path);
+            
+            dol_syslog("Found " . count($nextcloudFiles) . " files in Nextcloud", LOG_INFO);
             
             if (empty($nextcloudFiles)) {
                 return ['success' => true, 'message' => 'No files in Nextcloud folder', 'synced' => 0];

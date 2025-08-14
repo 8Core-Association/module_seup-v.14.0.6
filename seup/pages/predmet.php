@@ -145,6 +145,30 @@ llxHeader("", "SEUP - Predmet", '', '', 0, 0, '', '', '', 'mod-seup page-predmet
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     dol_syslog('POST request', LOG_INFO);
+    
+    // Handle manual sync request
+    if (isset($_POST['action']) && $_POST['action'] === 'sync_nextcloud') {
+        header('Content-Type: application/json');
+        ob_end_clean();
+        
+        $sync_type = GETPOST('sync_type', 'alpha') ?: 'nextcloud_to_ecm';
+        
+        try {
+            if ($sync_type === 'bidirectional') {
+                $result = Cloud_helper::bidirectionalSync($db, $conf, $user, $caseId);
+            } else {
+                $result = Cloud_helper::syncNextcloudToECM($db, $conf, $user, $caseId);
+            }
+            
+            echo json_encode($result);
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+        exit;
+    }
 
     // Handle document upload
     if (isset($_POST['action']) && GETPOST('action') === 'upload_document') {
@@ -181,23 +205,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 dol_syslog("Nextcloud upload error: " . $e->getMessage(), LOG_WARNING);
             }
         }
-        exit;
-    }
-
-    // Handle manual sync request
-    if (isset($_POST['action']) && GETPOST('action') === 'sync_nextcloud') {
-        header('Content-Type: application/json');
-        ob_end_clean();
-        
-        $sync_type = GETPOST('sync_type', 'alpha') ?: 'nextcloud_to_ecm';
-        
-        if ($sync_type === 'bidirectional') {
-            $result = Cloud_helper::bidirectionalSync($db, $conf, $user, $caseId);
-        } else {
-            $result = Cloud_helper::syncNextcloudToECM($db, $conf, $user, $caseId);
-        }
-        
-        echo json_encode($result);
         exit;
     }
 
@@ -655,6 +662,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const formData = new FormData();
         formData.append('action', 'sync_nextcloud');
         formData.append('sync_type', syncType);
+        formData.append('token', document.querySelector("input[name='token']").value);
         
         fetch('', {
             method: 'POST',
@@ -681,7 +689,7 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .catch(error => {
             console.error('Sync error:', error);
-            showMessage('Došlo je do greške pri sinkronizaciji', 'error');
+            showMessage('Došlo je do greške pri sinkronizaciji: ' + error.message, 'error');
         })
         .finally(() => {
             button.classList.remove('seup-loading');
