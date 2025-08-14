@@ -141,7 +141,7 @@ $form = new Form($db);
 $formfile = new FormFile($db);
 
 llxHeader("", "SEUP - Predmet", '', '', 0, 0, '', '', '', 'mod-seup page-predmet');
-
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = GETPOST('action', 'alpha');
     
     // Handle sync request
@@ -175,6 +175,7 @@ llxHeader("", "SEUP - Predmet", '', '', 0, 0, '', '', '', 'mod-seup page-predmet
             exit;
         }
     }
+}
     
     // Handle document upload
     if (isset($_POST['action']) && GETPOST('action') === 'upload_document') {
