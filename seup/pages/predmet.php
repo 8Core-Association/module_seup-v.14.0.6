@@ -176,6 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+}
     
     // Handle document upload
     if (isset($_POST['action']) && GETPOST('action') === 'upload_document') {
