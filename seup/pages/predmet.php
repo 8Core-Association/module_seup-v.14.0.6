@@ -62,6 +62,7 @@ require_once DOL_DOCUMENT_ROOT . '/ecm/class/ecmfiles.class.php';
 require_once __DIR__ . '/../class/predmet_helper.class.php';
 require_once __DIR__ . '/../class/request_handler.class.php';
 require_once __DIR__ . '/../class/cloud_helper.class.php';
+require_once __DIR__ . '/../class/cloud_helper.class.php';
 
 // Postavljanje debug logova
 error_reporting(E_ALL);
