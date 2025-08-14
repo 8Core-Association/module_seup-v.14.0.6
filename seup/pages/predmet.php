@@ -148,8 +148,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Handle manual sync request
     if (isset($_POST['action']) && $_POST['action'] === 'sync_nextcloud') {
+        // Clean output buffer and set JSON header immediately
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
         header('Content-Type: application/json');
-        ob_end_clean();
         
         $sync_type = GETPOST('sync_type', 'alpha') ?: 'nextcloud_to_ecm';
         
@@ -162,6 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             echo json_encode($result);
         } catch (Exception $e) {
+            dol_syslog("Sync exception: " . $e->getMessage(), LOG_ERR);
             echo json_encode([
                 'success' => false,
                 'error' => $e->getMessage()
@@ -659,17 +663,39 @@ document.addEventListener("DOMContentLoaded", function() {
     function performSync(syncType, button) {
         button.classList.add('seup-loading');
         
+        console.log('Starting sync with type:', syncType);
+        
         const formData = new FormData();
         formData.append('action', 'sync_nextcloud');
         formData.append('sync_type', syncType);
         formData.append('token', document.querySelector("input[name='token']").value);
         
+        console.log('FormData contents:');
+        for (let [key, value] of formData.entries()) {
+            console.log(key, value);
+        }
+        
         fetch('', {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers.get('content-type'));
+            
+            return response.text().then(text => {
+                console.log('Raw response:', text.substring(0, 200));
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('JSON parse error:', e);
+                    console.error('Response text:', text);
+                    throw new Error('Server returned invalid JSON: ' + text.substring(0, 100));
+                }
+            });
+        })
         .then(data => {
+            console.log('Parsed data:', data);
             if (data.success) {
                 showMessage(data.message, 'success');
                 

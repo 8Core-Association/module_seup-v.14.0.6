@@ -24,16 +24,24 @@ class Cloud_helper
      */
     public static function syncNextcloudToECM($db, $conf, $user, $predmet_id)
     {
+        dol_syslog("Cloud_helper::syncNextcloudToECM called for predmet: " . $predmet_id, LOG_INFO);
+        
         dol_syslog("Starting Nextcloud to ECM sync for predmet: " . $predmet_id, LOG_INFO);
         
         try {
             // Check if Nextcloud is enabled and configured
-            if (!getDolGlobalString('NEXTCLOUD_ENABLED', '0') || 
-                empty(getDolGlobalString('NEXTCLOUD_URL')) ||
-                empty(getDolGlobalString('NEXTCLOUD_USERNAME')) ||
-                empty(getDolGlobalString('NEXTCLOUD_PASSWORD'))) {
+            $nextcloud_enabled = getDolGlobalString('NEXTCLOUD_ENABLED', '0');
+            $nextcloud_url = getDolGlobalString('NEXTCLOUD_URL', '');
+            $nextcloud_username = getDolGlobalString('NEXTCLOUD_USERNAME', '');
+            $nextcloud_password = getDolGlobalString('NEXTCLOUD_PASSWORD', '');
+            
+            dol_syslog("Nextcloud config - Enabled: $nextcloud_enabled, URL: $nextcloud_url, Username: $nextcloud_username", LOG_INFO);
+            
+            if (!$nextcloud_enabled || 
+                empty($nextcloud_url) ||
+                empty($nextcloud_username) ||
+                empty($nextcloud_password)) {
                 dol_syslog("Nextcloud not configured properly", LOG_WARNING);
-                dol_syslog("Nextcloud not configured, skipping sync", LOG_INFO);
                 return ['success' => true, 'message' => 'Nextcloud not configured', 'synced' => 0];
             }
 
