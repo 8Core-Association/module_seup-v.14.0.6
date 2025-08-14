@@ -142,38 +142,6 @@ $formfile = new FormFile($db);
 
 llxHeader("", "SEUP - Predmet", '', '', 0, 0, '', '', '', 'mod-seup page-predmet');
 
-// Handle POST requests
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    dol_syslog('POST request', LOG_INFO);
-    
-    // Handle manual sync request
-    if (isset($_POST['action']) && $_POST['action'] === 'sync_nextcloud') {
-        // Clean output buffer and set JSON header immediately
-        while (ob_get_level()) {
-            ob_end_clean();
-        }
-        header('Content-Type: application/json');
-        
-        $sync_type = GETPOST('sync_type', 'alpha') ?: 'nextcloud_to_ecm';
-        
-        try {
-            if ($sync_type === 'bidirectional') {
-                $result = Cloud_helper::bidirectionalSync($db, $conf, $user, $caseId);
-            } else {
-                $result = Cloud_helper::syncNextcloudToECM($db, $conf, $user, $caseId);
-            }
-            
-            echo json_encode($result);
-        } catch (Exception $e) {
-            dol_syslog("Sync exception: " . $e->getMessage(), LOG_ERR);
-            echo json_encode([
-                'success' => false,
-                'error' => $e->getMessage()
-            ]);
-        }
-        exit;
-    }
-
     // Handle document upload
     if (isset($_POST['action']) && GETPOST('action') === 'upload_document') {
         // Upload to both Dolibarr ECM and Nextcloud
@@ -667,6 +635,7 @@ document.addEventListener("DOMContentLoaded", function() {
         
         const formData = new FormData();
         formData.append('action', 'sync_nextcloud');
+        formData.append('predmet_id', <?php echo $caseId; ?>);
         formData.append('sync_type', syncType);
         formData.append('token', document.querySelector("input[name='token']").value);
         
@@ -675,7 +644,7 @@ document.addEventListener("DOMContentLoaded", function() {
             console.log(key, value);
         }
         
-        fetch('', {
+        fetch('/custom/seup/ajax/sync_handler.php', {
             method: 'POST',
             body: formData
         })
