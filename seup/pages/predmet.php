@@ -632,6 +632,7 @@ document.addEventListener("DOMContentLoaded", function() {
         button.classList.add('seup-loading');
         
         console.log('Starting sync with type:', syncType);
+        console.log('Predmet ID:', <?php echo $caseId; ?>);
         
         const formData = new FormData();
         formData.append('action', 'sync_nextcloud');
@@ -644,6 +645,8 @@ document.addEventListener("DOMContentLoaded", function() {
             console.log(key, value);
         }
         
+        console.log('Sending request to:', '/custom/seup/ajax/sync_handler.php');
+        
         fetch('/custom/seup/ajax/sync_handler.php', {
             method: 'POST',
             body: formData
@@ -651,9 +654,11 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(response => {
             console.log('Response status:', response.status);
             console.log('Response headers:', response.headers.get('content-type'));
+            console.log('Response ok:', response.ok);
             
             return response.text().then(text => {
-                console.log('Raw response:', text.substring(0, 200));
+                console.log('Raw response (first 500 chars):', text.substring(0, 500));
+                console.log('Raw response (last 200 chars):', text.substring(Math.max(0, text.length - 200)));
                 try {
                     return JSON.parse(text);
                 } catch (e) {
@@ -679,7 +684,11 @@ document.addEventListener("DOMContentLoaded", function() {
                     refreshDocumentsList();
                 }, 1000);
             } else {
-                showMessage('Greška pri sinkronizaciji: ' + data.error, 'error');
+                let errorMsg = 'Greška pri sinkronizaciji: ' + data.error;
+                if (data.file && data.line) {
+                    errorMsg += ' (File: ' + data.file + ', Line: ' + data.line + ')';
+                }
+                showMessage(errorMsg, 'error');
             }
         })
         .catch(error => {
