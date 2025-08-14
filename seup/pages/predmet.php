@@ -61,6 +61,7 @@ require_once DOL_DOCUMENT_ROOT . '/ecm/class/ecmfiles.class.php';
 // Lokalne klase
 require_once __DIR__ . '/../class/predmet_helper.class.php';
 require_once __DIR__ . '/../class/request_handler.class.php';
+require_once __DIR__ . '/../class/cloud_helper.class.php';
 
 // Postavljanje debug logova
 error_reporting(E_ALL);
@@ -182,6 +183,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // Handle manual sync request
+    if (isset($_POST['action']) && GETPOST('action') === 'sync_nextcloud') {
+        header('Content-Type: application/json');
+        ob_end_clean();
+        
+        $sync_type = GETPOST('sync_type', 'alpha') ?: 'nextcloud_to_ecm';
+        
+        if ($sync_type === 'bidirectional') {
+            $result = Cloud_helper::bidirectionalSync($db, $conf, $user, $caseId);
+        } else {
+            $result = Cloud_helper::syncNextcloudToECM($db, $conf, $user, $caseId);
+        }
+        
+        echo json_encode($result);
+        exit;
+    }
+
     // Handle refresh documents request
     if (isset($_POST['action']) && GETPOST('action') === 'refresh_documents') {
         // Just continue with normal page rendering to return updated HTML
@@ -202,6 +220,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Content-Type: application/json');
         echo json_encode(['exists' => $exists, 'path' => $full_path]);
         exit;
+    }
+}
+
+// Auto-sync Nextcloud files to ECM when page loads
+if ($caseId) {
+    $autoSyncResult = Cloud_helper::autoSyncPredmet($db, $conf, $user, $caseId);
+    if ($autoSyncResult['synced'] > 0) {
+        dol_syslog("Auto-synced " . $autoSyncResult['synced'] . " files from Nextcloud", LOG_INFO);
     }
 }
 
@@ -357,6 +383,27 @@ print '<div class="seup-progress-text" id="progressText">Uploading...</div>';
 print '</div>';
 print '</div>';
 
+// Nextcloud sync section
+if (Cloud_helper::isNextcloudConfigured()) {
+    $syncStatus = Cloud_helper::getSyncStatus($db, $conf, $caseId);
+    
+    if ($syncStatus['sync_needed']) {
+        print '<div class="seup-sync-alert">';
+        print '<div class="seup-sync-content">';
+        print '<i class="fas fa-cloud-download-alt seup-sync-icon"></i>';
+        print '<div class="seup-sync-text">';
+        print 'Detektirane su promjene u Nextcloud mapi. ';
+        print 'ECM: ' . $syncStatus['ecm_files'] . ' datoteka, ';
+        print 'Nextcloud: ' . $syncStatus['nextcloud_files'] . ' datoteka.';
+        print '</div>';
+        print '<button type="button" class="seup-btn seup-btn-warning seup-btn-sm" id="syncBtn">';
+        print '<i class="fas fa-sync me-2"></i>Sinkroniziraj';
+        print '</button>';
+        print '</div>';
+        print '</div>';
+    }
+}
+
 // Documents display
 if (strpos($documentTableHTML, 'NoDocumentsFound') !== false || strpos($documentTableHTML, 'alert-info') !== false) {
     print '<div class="seup-no-documents">';
@@ -381,6 +428,11 @@ print '</button>';
 print '<button type="button" class="seup-btn seup-btn-secondary">';
 print '<i class="fas fa-sort me-2"></i>Sortiraj';
 print '</button>';
+if (Cloud_helper::isNextcloudConfigured()) {
+    print '<button type="button" class="seup-btn seup-btn-secondary" id="manualSyncBtn">';
+    print '<i class="fas fa-cloud-download-alt me-2"></i>Ručna Sinkronizacija';
+    print '</button>';
+}
 print '</div>';
 print '</div>';
 
@@ -580,6 +632,61 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
+    // Nextcloud sync functionality
+    const syncBtn = document.getElementById('syncBtn');
+    const manualSyncBtn = document.getElementById('manualSyncBtn');
+
+    if (syncBtn) {
+        syncBtn.addEventListener('click', function() {
+            performSync('nextcloud_to_ecm', this);
+        });
+    }
+
+    if (manualSyncBtn) {
+        manualSyncBtn.addEventListener('click', function() {
+            performSync('bidirectional', this);
+        });
+    }
+
+    function performSync(syncType, button) {
+        button.classList.add('seup-loading');
+        
+        const formData = new FormData();
+        formData.append('action', 'sync_nextcloud');
+        formData.append('sync_type', syncType);
+        
+        fetch('', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage(data.message, 'success');
+                
+                // Hide sync alert if it exists
+                const syncAlert = document.querySelector('.seup-sync-alert');
+                if (syncAlert) {
+                    syncAlert.style.display = 'none';
+                }
+                
+                // Refresh documents list
+                setTimeout(() => {
+                    refreshDocumentsList();
+                }, 1000);
+            } else {
+                showMessage('Greška pri sinkronizaciji: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Sync error:', error);
+            showMessage('Došlo je do greške pri sinkronizaciji', 'error');
+        })
+        .finally(() => {
+            button.classList.remove('seup-loading');
+        });
+    }
+
     // Function to refresh documents list
     function refreshDocumentsList() {
         // Create a form to refresh the documents
@@ -765,6 +872,16 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Add file type icons to document table
     addFileTypeIcons();
+
+    // Auto-refresh documents every 30 seconds if Nextcloud is enabled
+    <?php if (Cloud_helper::isNextcloudConfigured()): ?>
+    setInterval(() => {
+        // Only refresh if user is on documents tab and page is visible
+        if (!document.hidden && document.querySelector('.seup-tab[data-tab="dokumenti"]').classList.contains('active')) {
+            refreshDocumentsList();
+        }
+    }, 30000); // 30 seconds
+    <?php endif; ?>
 });
 
 // Auto-check for file changes when tab is activated
