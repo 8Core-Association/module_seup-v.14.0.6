@@ -108,6 +108,9 @@ error_log("sync_handler.php: Essential Dolibarr objects verified");
 
 // Load required classes with error checking
 $cloud_helper_path = __DIR__ . '/../class/cloud_helper.class.php';
+$predmet_helper_path = __DIR__ . '/../class/predmet_helper.class.php';
+$nextcloud_api_path = __DIR__ . '/../class/nextcloud_api.class.php';
+
 error_log("sync_handler.php: Looking for Cloud_helper at: " . $cloud_helper_path);
 
 if (!file_exists($cloud_helper_path)) {
@@ -118,7 +121,15 @@ if (!file_exists($cloud_helper_path)) {
 }
 
 error_log("sync_handler.php: Cloud_helper file found, requiring...");
+
+// Load all required classes
 require_once $cloud_helper_path;
+if (file_exists($predmet_helper_path)) {
+    require_once $predmet_helper_path;
+}
+if (file_exists($nextcloud_api_path)) {
+    require_once $nextcloud_api_path;
+}
 
 // Check if class exists
 if (!class_exists('Cloud_helper')) {
@@ -173,6 +184,17 @@ try {
     switch ($action) {
         case 'sync_nextcloud':
             error_log("sync_handler.php: Calling sync method with type: $sync_type");
+            
+            // Check if Nextcloud is configured before attempting sync
+            if (!Cloud_helper::isNextcloudConfigured()) {
+                $result = [
+                    'success' => true,
+                    'message' => 'Nextcloud nije konfiguriran - sync preskočen',
+                    'synced' => 0
+                ];
+                break;
+            }
+            
             if ($sync_type === 'bidirectional') {
                 $result = Cloud_helper::bidirectionalSync($db, $conf, $user, $predmet_id);
             } else {
@@ -209,12 +231,18 @@ try {
 } catch (Exception $e) {
     error_log("sync_handler.php: Exception caught: " . $e->getMessage());
     error_log("sync_handler.php: Stack trace: " . $e->getTraceAsString());
+    
+    // Also log file and line for easier debugging
+    error_log("sync_handler.php: Exception in file: " . $e->getFile() . " on line: " . $e->getLine());
+    
     http_response_code(500);
     echo json_encode([
         'success' => false,
         'error' => $e->getMessage(),
         'file' => $e->getFile(),
         'line' => $e->getLine(),
+        'class_exists' => class_exists('Cloud_helper'),
+        'nextcloud_configured' => function_exists('getDolGlobalString') ? getDolGlobalString('NEXTCLOUD_ENABLED', '0') : 'unknown',
         'debug_info' => [
             'post_data' => $_POST,
             'get_data' => $_GET,

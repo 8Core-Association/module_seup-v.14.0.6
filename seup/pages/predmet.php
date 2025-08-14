@@ -656,9 +656,19 @@ document.addEventListener("DOMContentLoaded", function() {
             console.log('Response headers:', response.headers.get('content-type'));
             console.log('Response ok:', response.ok);
             
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             return response.text().then(text => {
                 console.log('Raw response (first 500 chars):', text.substring(0, 500));
-                console.log('Raw response (last 200 chars):', text.substring(Math.max(0, text.length - 200)));
+                
+                // If response is not JSON, show full response
+                if (!text.trim().startsWith('{')) {
+                    console.error('Non-JSON response received:', text);
+                    throw new Error('Server returned HTML instead of JSON. Check server logs.');
+                }
+                
                 try {
                     return JSON.parse(text);
                 } catch (e) {
