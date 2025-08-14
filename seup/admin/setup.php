@@ -426,6 +426,35 @@ print '<p>' . $status_text . '</p>';
 print '</div>';
 print '</div>';
 
+// Add sync report section if Nextcloud is configured
+if ($status_class === 'success') {
+    require_once __DIR__ . '/../class/cloud_helper.class.php';
+    $syncReport = Cloud_helper::getSyncReport($db, $conf);
+    
+    print '<div class="seup-sync-report">';
+    print '<h5><i class="fas fa-chart-line me-2"></i>Izvještaj Sinkronizacije</h5>';
+    print '<div class="seup-sync-stats">';
+    print '<div class="seup-sync-stat">';
+    print '<span class="seup-sync-label">Ukupno predmeta:</span>';
+    print '<span class="seup-sync-value">' . $syncReport['total_predmeti'] . '</span>';
+    print '</div>';
+    print '<div class="seup-sync-stat">';
+    print '<span class="seup-sync-label">Sinkronizirano:</span>';
+    print '<span class="seup-sync-value">' . $syncReport['synced_predmeti'] . '</span>';
+    print '</div>';
+    if (!empty($syncReport['sync_issues'])) {
+        print '<div class="seup-sync-stat">';
+        print '<span class="seup-sync-label">Problemi:</span>';
+        print '<span class="seup-sync-value seup-sync-warning">' . count($syncReport['sync_issues']) . '</span>';
+        print '</div>';
+    }
+    print '</div>';
+    print '<button type="button" class="seup-btn seup-btn-secondary seup-btn-sm" id="bulkSyncBtn">';
+    print '<i class="fas fa-sync me-2"></i>Masovna Sinkronizacija';
+    print '</button>';
+    print '</div>';
+}
+
 print '</div>';
 print '</div>';
 
@@ -469,6 +498,38 @@ document.addEventListener("DOMContentLoaded", function() {
                 this.disabled = false;
                 this.innerHTML = "<i class=\'fas fa-plug\'></i> Test Connection";
             });
+        });
+    }
+    
+    // Bulk sync functionality
+    const bulkSyncBtn = document.getElementById('bulkSyncBtn');
+    if (bulkSyncBtn) {
+        bulkSyncBtn.addEventListener('click', function() {
+            if (confirm('Pokrenuti masovnu sinkronizaciju svih predmeta? Ovo može potrajati.')) {
+                this.classList.add('seup-loading');
+                
+                const formData = new FormData();
+                formData.append('action', 'bulk_sync');
+                
+                fetch('', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage(data.message, 'success');
+                    } else {
+                        showMessage('Greška: ' + data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    showMessage('Došlo je do greške', 'error');
+                })
+                .finally(() => {
+                    this.classList.remove('seup-loading');
+                });
+            }
         });
     }
 });
@@ -798,6 +859,54 @@ print '<style>
     animation: slideInUp 0.3s ease-out;
 }
 
+.seup-sync-report {
+  background: var(--primary-50);
+  border: 1px solid var(--primary-200);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.seup-sync-report h5 {
+  margin: 0 0 var(--space-3) 0;
+  color: var(--primary-800);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+}
+
+.seup-sync-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.seup-sync-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2);
+  background: white;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--primary-200);
+}
+
+.seup-sync-label {
+  font-size: var(--text-sm);
+  color: var(--primary-700);
+  font-weight: var(--font-medium);
+}
+
+.seup-sync-value {
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  color: var(--primary-800);
+}
+
+.seup-sync-warning {
+  color: var(--warning-700);
+}
+
 /* Enhanced tab styling */
 .seup-admin-tabs .fiche_titre {
     background: white;
@@ -863,6 +972,18 @@ print '<style>
     }
 }
 </style>';
+
+// Handle bulk sync request
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && GETPOST('action') === 'bulk_sync') {
+    header('Content-Type: application/json');
+    ob_end_clean();
+    
+    require_once __DIR__ . '/../class/cloud_helper.class.php';
+    $result = Cloud_helper::bulkSyncAllPredmeti($db, $conf, $user, 20);
+    
+    echo json_encode($result);
+    exit;
+}
 
 foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
 	if (!empty($myTmpObjectArray['includerefgeneration'])) {
